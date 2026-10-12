@@ -89,7 +89,6 @@
   .status.ok { color: var(--ok); }
   .status.err { color: var(--err); }
 
-  /* Renk testi */
   .color-swatches {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -103,18 +102,6 @@
     cursor: pointer;
   }
 
-  /* Dokunmatik canvas */
-  #touchCanvas {
-    width: 100%;
-    height: 220px;
-    background: #0a0f22;
-    border-radius: 10px;
-    touch-action: none;
-    display: block;
-    margin-top: 8px;
-  }
-
-  /* Mikrofon görselleştirme */
   #micCanvas {
     width: 100%;
     height: 120px;
@@ -124,7 +111,6 @@
     margin-top: 8px;
   }
 
-  /* Tam ekran renk kaplaması */
   #fullscreenColor {
     position: fixed;
     inset: 0;
@@ -139,17 +125,69 @@
   }
   #fullscreenColor.active { display: flex; }
 
-  .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 6px;
-    background: #2a3358;
-    font-size: 11px;
-    color: var(--muted);
-    margin-left: 6px;
+  /* ============ TAM EKRAN DOKUNMATİK OVERLAY ============ */
+  #touchOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: #05070f;
+    display: none;
+    touch-action: none;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  .badge.ok { background: rgba(34,197,94,0.15); color: var(--ok); }
-  .badge.err { background: rgba(239,68,68,0.15); color: var(--err); }
+  #touchOverlay.active { display: block; }
+
+  #touchCanvasFull {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+  }
+
+  #closeTouchFull {
+    position: absolute;
+    top: calc(env(safe-area-inset-top) + 12px);
+    right: calc(env(safe-area-inset-right) + 12px);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    border: 1px solid rgba(255,255,255,0.25);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    z-index: 2;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #touchHUD {
+    position: absolute;
+    bottom: calc(env(safe-area-inset-bottom) + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    padding: 8px 14px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 999px;
+    color: #eaf0ff;
+    font-size: 13px;
+    font-weight: 600;
+    backdrop-filter: blur(8px);
+    pointer-events: none;
+    white-space: nowrap;
+  }
 </style>
 </head>
 <body>
@@ -177,14 +215,11 @@
     <div class="status">Bir renge dokunun → tam ekran gösterim. Çıkmak için ekrana dokunun.</div>
   </section>
 
-  <!-- 2. DOKUNMATİK TESTİ -->
+  <!-- 2. DOKUNMATİK TESTİ (TAM EKRAN) -->
   <section class="card">
-    <h2><span class="dot" id="dotTouch"></span> 2. Dokunmatik Testi</h2>
-    <canvas id="touchCanvas"></canvas>
-    <div class="row" style="margin-top:8px">
-      <button class="secondary" id="clearTouch">Temizle</button>
-    </div>
-    <div class="status" id="touchStatus">Parmağınızı canvas üzerinde gezdirin (çoklu dokunma desteklenir).</div>
+    <h2><span class="dot" id="dotTouch"></span> 2. Dokunmatik Testi (Tam Ekran)</h2>
+    <button id="startTouchFull">👆 Tam Ekran Dokunmatik Testini Başlat</button>
+    <div class="status" id="touchStatus">Ekranın tamamında çoklu dokunma testi.</div>
   </section>
 
   <!-- 3. HOPARLÖR TESTİ -->
@@ -234,12 +269,22 @@
 
 </main>
 
-<!-- Tam ekran renk katmanı -->
+<!-- TAM EKRAN RENK KATMANI -->
 <div id="fullscreenColor"></div>
+
+<!-- TAM EKRAN DOKUNMATİK OVERLAY -->
+<div id="touchOverlay" aria-hidden="true">
+  <canvas id="touchCanvasFull"></canvas>
+  <button id="closeTouchFull" aria-label="Kapat">✕</button>
+  <div id="touchHUD">
+    <span id="touchCount">0 parmak</span>
+    <span id="touchInfo">—</span>
+  </div>
+</div>
 
 <script>
 /* ============================================================
-   0. GENEL YARDIMCILAR
+   0. YARDIMCILAR
 ============================================================ */
 const $ = (s) => document.querySelector(s);
 
@@ -259,11 +304,9 @@ document.querySelectorAll('.swatch').forEach(sw => {
     const color = sw.dataset.color;
     fsColor.style.background = color;
     fsColor.textContent = color;
-    // Kontrast için yazı rengi
     fsColor.style.color = (color === '#000000') ? '#ffffff' : 'rgba(0,0,0,0.6)';
     fsColor.classList.add('active');
     setDot('dotColor', 'ok');
-    // Fullscreen API dene (kullanıcı etkileşimi sonrası)
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(()=>{});
     }
@@ -277,71 +320,213 @@ fsColor.addEventListener('click', () => {
 });
 
 /* ============================================================
-   2. DOKUNMATİK TESTİ
+   2. DOKUNMATİK TESTİ (TAM EKRAN)
 ============================================================ */
-const touchCanvas = $('#touchCanvas');
-const tctx = touchCanvas.getContext('2d');
-let activeTouches = {};
+const touchOverlay   = document.getElementById('touchOverlay');
+const touchCanvas    = document.getElementById('touchCanvasFull');
+const tctx           = touchCanvas.getContext('2d');
+const touchHUDCount  = document.getElementById('touchCount');
+const touchHUDInfo   = document.getElementById('touchInfo');
 
-function resizeTouchCanvas() {
-  const rect = touchCanvas.getBoundingClientRect();
+let activeTouches = new Map();
+let rafId = null;
+
+const TOUCH_PALETTE = [
+  '#4f8cff', '#22c55e', '#ef4444', '#f59e0b',
+  '#a855f7', '#06b6d4', '#ec4899', '#84cc16',
+  '#f97316', '#14b8a6'
+];
+function colorForId(id) {
+  return TOUCH_PALETTE[Math.abs(id) % TOUCH_PALETTE.length];
+}
+
+function resizeFullCanvas() {
   const dpr = window.devicePixelRatio || 1;
-  touchCanvas.width = rect.width * dpr;
-  touchCanvas.height = rect.height * dpr;
+  const w = touchOverlay.clientWidth;
+  const h = touchOverlay.clientHeight;
+  touchCanvas.width  = w * dpr;
+  touchCanvas.height = h * dpr;
+  touchCanvas.style.width  = w + 'px';
+  touchCanvas.style.height = h + 'px';
   tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  tctx.clearRect(0, 0, rect.width, rect.height);
 }
-window.addEventListener('resize', resizeTouchCanvas);
-resizeTouchCanvas();
+window.addEventListener('resize', () => {
+  if (touchOverlay.classList.contains('active')) resizeFullCanvas();
+});
 
-const touchColors = ['#4f8cff', '#22c55e', '#ef4444', '#f59e0b', '#a855f7', '#06b6d4'];
-
-function drawTouch(x, y, id) {
-  const color = touchColors[id % touchColors.length];
-  tctx.beginPath();
-  tctx.fillStyle = color;
-  tctx.arc(x, y, 22, 0, Math.PI * 2);
-  tctx.fill();
-  tctx.fillStyle = '#fff';
-  tctx.font = 'bold 12px sans-serif';
-  tctx.textAlign = 'center';
-  tctx.textBaseline = 'middle';
-  tctx.fillText(id, x, y);
-}
-
-function handleTouchStart(e) {
-  e.preventDefault();
+function pointFromTouch(t) {
   const rect = touchCanvas.getBoundingClientRect();
+  return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
   for (const t of e.changedTouches) {
-    activeTouches[t.identifier] = t;
-    drawTouch(t.clientX - rect.left, t.clientY - rect.top, t.identifier);
+    const p = pointFromTouch(t);
+    activeTouches.set(t.identifier, {
+      x: p.x, y: p.y,
+      color: colorForId(t.identifier),
+      trail: [{ x: p.x, y: p.y }]
+    });
   }
-  $('#touchStatus').textContent = `Aktif dokunma sayısı: ${Object.keys(activeTouches).length}`;
+  updateHUD();
   setDot('dotTouch', 'ok');
 }
-function handleTouchMove(e) {
-  e.preventDefault();
-  const rect = touchCanvas.getBoundingClientRect();
-  for (const t of e.changedTouches) {
-    drawTouch(t.clientX - rect.left, t.clientY - rect.top, t.identifier);
-  }
-}
-function handleTouchEnd(e) {
+
+function onTouchMove(e) {
   e.preventDefault();
   for (const t of e.changedTouches) {
-    delete activeTouches[t.identifier];
+    const entry = activeTouches.get(t.identifier);
+    if (!entry) continue;
+    const p = pointFromTouch(t);
+    entry.x = p.x;
+    entry.y = p.y;
+    entry.trail.push({ x: p.x, y: p.y });
+    if (entry.trail.length > 40) entry.trail.shift();
   }
-  $('#touchStatus').textContent = `Aktif dokunma sayısı: ${Object.keys(activeTouches).length}`;
+  updateHUD();
 }
-touchCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-touchCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-touchCanvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-touchCanvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-$('#clearTouch').addEventListener('click', () => {
+
+function onTouchEnd(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    activeTouches.delete(t.identifier);
+  }
+  updateHUD();
+  if (activeTouches.size === 0) {
+    setTimeout(() => {
+      if (activeTouches.size === 0) {
+        tctx.clearRect(0, 0, touchCanvas.width, touchCanvas.height);
+      }
+    }, 600);
+  }
+}
+
+function updateHUD() {
+  touchHUDCount.textContent = `${activeTouches.size} parmak`;
+  if (activeTouches.size > 0) {
+    const last = [...activeTouches.values()].pop();
+    touchHUDInfo.textContent = `x: ${Math.round(last.x)} • y: ${Math.round(last.y)}`;
+  } else {
+    touchHUDInfo.textContent = '—';
+  }
+}
+
+function render() {
+  rafId = requestAnimationFrame(render);
+  const w = touchCanvas.width;
+  const h = touchCanvas.height;
+  tctx.clearRect(0, 0, w, h);
+
+  for (const [id, t] of activeTouches) {
+    if (t.trail.length > 1) {
+      tctx.lineWidth = 4;
+      tctx.lineCap = 'round';
+      tctx.lineJoin = 'round';
+      tctx.strokeStyle = t.color + '80';
+      tctx.beginPath();
+      tctx.moveTo(t.trail[0].x, t.trail[0].y);
+      for (let i = 1; i < t.trail.length; i++) {
+        tctx.lineTo(t.trail[i].x, t.trail[i].y);
+      }
+      tctx.stroke();
+    }
+
+    const pulse = 26 + Math.sin(performance.now() / 200 + id) * 4;
+    tctx.beginPath();
+    tctx.arc(t.x, t.y, pulse + 8, 0, Math.PI * 2);
+    tctx.strokeStyle = t.color + '55';
+    tctx.lineWidth = 2;
+    tctx.stroke();
+
+    tctx.beginPath();
+    tctx.fillStyle = t.color;
+    tctx.arc(t.x, t.y, pulse, 0, Math.PI * 2);
+    tctx.fill();
+
+    tctx.fillStyle = '#fff';
+    tctx.font = 'bold 14px system-ui, sans-serif';
+    tctx.textAlign = 'center';
+    tctx.textBaseline = 'middle';
+    tctx.fillText('#' + id, t.x, t.y);
+  }
+}
+
+function openTouchFull() {
+  touchOverlay.classList.add('active');
+  touchOverlay.setAttribute('aria-hidden', 'false');
+  resizeFullCanvas();
+  activeTouches.clear();
+  updateHUD();
+  if (!rafId) render();
+  if (document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  }
+}
+
+function closeTouchFull() {
+  touchOverlay.classList.remove('active');
+  touchOverlay.setAttribute('aria-hidden', 'true');
+  activeTouches.clear();
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  tctx.clearRect(0, 0, touchCanvas.width, touchCanvas.height);
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+touchCanvas.addEventListener('touchstart',  onTouchStart,  { passive: false });
+touchCanvas.addEventListener('touchmove',   onTouchMove,   { passive: false });
+touchCanvas.addEventListener('touchend',    onTouchEnd,    { passive: false });
+touchCanvas.addEventListener('touchcancel', onTouchEnd,    { passive: false });
+
+/* Fare desteği (masaüstü testleri için) */
+touchCanvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') return;
   const rect = touchCanvas.getBoundingClientRect();
-  tctx.clearRect(0, 0, rect.width, rect.height);
-  activeTouches = {};
-  $('#touchStatus').textContent = 'Temizlendi.';
+  activeTouches.set('mouse', {
+    x: e.clientX - rect.left, y: e.clientY - rect.top,
+    color: colorForId(0),
+    trail: [{ x: e.clientX - rect.left, y: e.clientY - rect.top }]
+  });
+  updateHUD();
+  setDot('dotTouch', 'ok');
+});
+touchCanvas.addEventListener('pointermove', (e) => {
+  if (e.pointerType === 'touch') return;
+  const entry = activeTouches.get('mouse');
+  if (!entry || e.buttons === 0) return;
+  const rect = touchCanvas.getBoundingClientRect();
+  entry.x = e.clientX - rect.left;
+  entry.y = e.clientY - rect.top;
+  entry.trail.push({ x: entry.x, y: entry.y });
+  if (entry.trail.length > 40) entry.trail.shift();
+  updateHUD();
+});
+touchCanvas.addEventListener('pointerup', (e) => {
+  if (e.pointerType === 'touch') return;
+  activeTouches.delete('mouse');
+  updateHUD();
+});
+
+document.getElementById('startTouchFull').addEventListener('click', openTouchFull);
+document.getElementById('closeTouchFull').addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeTouchFull();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && touchOverlay.classList.contains('active')) {
+    closeTouchFull();
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  } else if (touchOverlay.classList.contains('active') && !rafId) {
+    render();
+  }
 });
 
 /* ============================================================
@@ -381,9 +566,7 @@ function playTone(freq = 440, pan = 0, duration = 0) {
   currentOsc = osc;
   currentGain = gain;
 
-  if (duration > 0) {
-    setTimeout(() => stopTone(), duration);
-  }
+  if (duration > 0) setTimeout(() => stopTone(), duration);
   $('#speakerStatus').textContent = `Çalıyor: ${freq}Hz (pan: ${pan})`;
   $('#speakerStatus').className = 'status ok';
   setDot('dotSpeaker', 'ok');
@@ -394,7 +577,7 @@ function stopTone() {
     try { currentOsc.stop(); } catch(e){}
     currentOsc = null;
   }
-  if (currentGain) { currentGain = null; }
+  currentGain = null;
   $('#speakerStatus').textContent = 'Durduruldu.';
 }
 
@@ -444,8 +627,7 @@ async function startMic() {
       mctx.strokeStyle = '#4f8cff';
       mctx.beginPath();
       const slice = w / data.length;
-      let x = 0;
-      let peak = 0;
+      let x = 0, peak = 0;
       for (let i = 0; i < data.length; i++) {
         const v = data[i] / 128.0;
         const y = (v * h) / 2;
@@ -525,8 +707,7 @@ async function testNetwork() {
 
   const start = performance.now();
   try {
-    // Cache bypass ile küçük bir istek
-    const res = await fetch('https://www.gstatic.com/generate_204?_=' + Date.now(), {
+    await fetch('https://www.gstatic.com/generate_204?_=' + Date.now(), {
       method: 'GET',
       cache: 'no-store',
       mode: 'no-cors'
@@ -554,7 +735,7 @@ $('#testNet').addEventListener('click', testNetwork);
 testNetwork();
 
 /* ============================================================
-   SERVICE WORKER KAYDI
+   SERVICE WORKER
 ============================================================ */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
