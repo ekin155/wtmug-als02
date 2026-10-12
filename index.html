@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1020">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Donanım Test PWA</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --bg: #0b1020;
+    --card: #151b33;
+    --accent: #4f8cff;
+    --text: #eaf0ff;
+    --muted: #8892b0;
+    --ok: #22c55e;
+    --err: #ef4444;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overflow-x: hidden;
+  }
+  header {
+    padding: 20px 16px 12px;
+    text-align: center;
+    border-bottom: 1px solid #1f2745;
+    position: sticky; top: 0;
+    background: rgba(11,16,32,0.95);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  header h1 { margin: 0; font-size: 20px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+
+  main { padding: 16px; display: grid; gap: 14px; }
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 16px;
+    border: 1px solid #1f2745;
+  }
+  .card h2 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .card h2 .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .card h2 .dot.err { background: var(--err); }
+
+  button, .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+    transition: transform .05s;
+  }
+  button:active { transform: scale(0.98); }
+  button.secondary { background: #2a3358; }
+  button.danger { background: var(--err); }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row button { flex: 1; margin-top: 0; min-width: 100px; }
+
+  .status {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 8px;
+    word-break: break-word;
+  }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+
+  /* Renk testi */
+  .color-swatches {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .swatch {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 2px solid #2a3358;
+    cursor: pointer;
+  }
+
+  /* Dokunmatik canvas */
+  #touchCanvas {
+    width: 100%;
+    height: 220px;
+    background: #0a0f22;
+    border-radius: 10px;
+    touch-action: none;
+    display: block;
+    margin-top: 8px;
+  }
+
+  /* Mikrofon görselleştirme */
+  #micCanvas {
+    width: 100%;
+    height: 120px;
+    background: #0a0f22;
+    border-radius: 10px;
+    display: block;
+    margin-top: 8px;
+  }
+
+  /* Tam ekran renk kaplaması */
+  #fullscreenColor {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: rgba(0,0,0,0.6);
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #fullscreenColor.active { display: flex; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #2a3358;
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .badge.ok { background: rgba(34,197,94,0.15); color: var(--ok); }
+  .badge.err { background: rgba(239,68,68,0.15); color: var(--err); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔧 Donanım Test PWA</h1>
+  <p>Pixel 7 • Android 14 uyumlu</p>
+</header>
+
+<main>
+
+  <!-- 1. EKRAN RENGİ TESTİ -->
+  <section class="card">
+    <h2><span class="dot" id="dotColor"></span> 1. Ekran Rengi Testi</h2>
+    <div class="color-swatches">
+      <div class="swatch" style="background:#ff0000" data-color="#ff0000"></div>
+      <div class="swatch" style="background:#00ff00" data-color="#00ff00"></div>
+      <div class="swatch" style="background:#0000ff" data-color="#0000ff"></div>
+      <div class="swatch" style="background:#ffffff" data-color="#ffffff"></div>
+      <div class="swatch" style="background:#000000" data-color="#000000"></div>
+      <div class="swatch" style="background:#ffff00" data-color="#ffff00"></div>
+      <div class="swatch" style="background:#00ffff" data-color="#00ffff"></div>
+      <div class="swatch" style="background:#ff00ff" data-color="#ff00ff"></div>
+    </div>
+    <div class="status">Bir renge dokunun → tam ekran gösterim. Çıkmak için ekrana dokunun.</div>
+  </section>
+
+  <!-- 2. DOKUNMATİK TESTİ -->
+  <section class="card">
+    <h2><span class="dot" id="dotTouch"></span> 2. Dokunmatik Testi</h2>
+    <canvas id="touchCanvas"></canvas>
+    <div class="row" style="margin-top:8px">
+      <button class="secondary" id="clearTouch">Temizle</button>
+    </div>
+    <div class="status" id="touchStatus">Parmağınızı canvas üzerinde gezdirin (çoklu dokunma desteklenir).</div>
+  </section>
+
+  <!-- 3. HOPARLÖR TESTİ -->
+  <section class="card">
+    <h2><span class="dot" id="dotSpeaker"></span> 3. Hoparlör Testi</h2>
+    <div class="row">
+      <button id="playTone">🔊 440Hz Ton</button>
+      <button class="secondary" id="stopTone">Durdur</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="secondary" id="playLeft">Sol Kanal</button>
+      <button class="secondary" id="playRight">Sağ Kanal</button>
+    </div>
+    <div class="status" id="speakerStatus">Ses çalmak için bir butona dokunun.</div>
+  </section>
+
+  <!-- 4. MİKROFON TESTİ -->
+  <section class="card">
+    <h2><span class="dot" id="dotMic"></span> 4. Mikrofon Testi</h2>
+    <canvas id="micCanvas"></canvas>
+    <div class="row" style="margin-top:8px">
+      <button id="startMic">🎤 Başlat</button>
+      <button class="secondary" id="stopMic">Durdur</button>
+    </div>
+    <div class="status" id="micStatus">Mikrofonu başlatmak için butona dokunun (izin gerekir).</div>
+  </section>
+
+  <!-- 5. TİTREŞİM TESTİ -->
+  <section class="card">
+    <h2><span class="dot" id="dotVibrate"></span> 5. Titreşim Testi</h2>
+    <div class="row">
+      <button id="vibShort">Kısa (100ms)</button>
+      <button class="secondary" id="vibLong">Uzun (500ms)</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="secondary" id="vibPattern">Desen: 200-100-200</button>
+    </div>
+    <div class="status" id="vibStatus">Titreşim API durumu kontrol ediliyor...</div>
+  </section>
+
+  <!-- 6. İNTERNET BAĞLANTI TESTİ -->
+  <section class="card">
+    <h2><span class="dot" id="dotNet"></span> 6. İnternet Bağlantı Testi</h2>
+    <div class="status" id="netStatus">Kontrol ediliyor...</div>
+    <button class="secondary" id="testNet" style="margin-top:8px">🔄 Yeniden Test Et</button>
+  </section>
+
+</main>
+
+<!-- Tam ekran renk katmanı -->
+<div id="fullscreenColor"></div>
+
+<script>
+/* ============================================================
+   0. GENEL YARDIMCILAR
+============================================================ */
+const $ = (s) => document.querySelector(s);
+
+function setDot(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('ok', 'err');
+  if (state) el.classList.add(state);
+}
+
+/* ============================================================
+   1. EKRAN RENGİ TESTİ
+============================================================ */
+const fsColor = $('#fullscreenColor');
+document.querySelectorAll('.swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    const color = sw.dataset.color;
+    fsColor.style.background = color;
+    fsColor.textContent = color;
+    // Kontrast için yazı rengi
+    fsColor.style.color = (color === '#000000') ? '#ffffff' : 'rgba(0,0,0,0.6)';
+    fsColor.classList.add('active');
+    setDot('dotColor', 'ok');
+    // Fullscreen API dene (kullanıcı etkileşimi sonrası)
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(()=>{});
+    }
+  });
+});
+fsColor.addEventListener('click', () => {
+  fsColor.classList.remove('active');
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(()=>{});
+  }
+});
+
+/* ============================================================
+   2. DOKUNMATİK TESTİ
+============================================================ */
+const touchCanvas = $('#touchCanvas');
+const tctx = touchCanvas.getContext('2d');
+let activeTouches = {};
+
+function resizeTouchCanvas() {
+  const rect = touchCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  touchCanvas.width = rect.width * dpr;
+  touchCanvas.height = rect.height * dpr;
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  tctx.clearRect(0, 0, rect.width, rect.height);
+}
+window.addEventListener('resize', resizeTouchCanvas);
+resizeTouchCanvas();
+
+const touchColors = ['#4f8cff', '#22c55e', '#ef4444', '#f59e0b', '#a855f7', '#06b6d4'];
+
+function drawTouch(x, y, id) {
+  const color = touchColors[id % touchColors.length];
+  tctx.beginPath();
+  tctx.fillStyle = color;
+  tctx.arc(x, y, 22, 0, Math.PI * 2);
+  tctx.fill();
+  tctx.fillStyle = '#fff';
+  tctx.font = 'bold 12px sans-serif';
+  tctx.textAlign = 'center';
+  tctx.textBaseline = 'middle';
+  tctx.fillText(id, x, y);
+}
+
+function handleTouchStart(e) {
+  e.preventDefault();
+  const rect = touchCanvas.getBoundingClientRect();
+  for (const t of e.changedTouches) {
+    activeTouches[t.identifier] = t;
+    drawTouch(t.clientX - rect.left, t.clientY - rect.top, t.identifier);
+  }
+  $('#touchStatus').textContent = `Aktif dokunma sayısı: ${Object.keys(activeTouches).length}`;
+  setDot('dotTouch', 'ok');
+}
+function handleTouchMove(e) {
+  e.preventDefault();
+  const rect = touchCanvas.getBoundingClientRect();
+  for (const t of e.changedTouches) {
+    drawTouch(t.clientX - rect.left, t.clientY - rect.top, t.identifier);
+  }
+}
+function handleTouchEnd(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    delete activeTouches[t.identifier];
+  }
+  $('#touchStatus').textContent = `Aktif dokunma sayısı: ${Object.keys(activeTouches).length}`;
+}
+touchCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+touchCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+touchCanvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+touchCanvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+$('#clearTouch').addEventListener('click', () => {
+  const rect = touchCanvas.getBoundingClientRect();
+  tctx.clearRect(0, 0, rect.width, rect.height);
+  activeTouches = {};
+  $('#touchStatus').textContent = 'Temizlendi.';
+});
+
+/* ============================================================
+   3. HOPARLÖR TESTİ
+============================================================ */
+let audioCtx = null;
+let currentOsc = null;
+let currentGain = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTone(freq = 440, pan = 0, duration = 0) {
+  const ctx = ensureAudioCtx();
+  stopTone();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.value = 0.15;
+
+  if (panner) {
+    panner.pan.value = pan;
+    osc.connect(gain).connect(panner).connect(ctx.destination);
+  } else {
+    osc.connect(gain).connect(ctx.destination);
+  }
+
+  osc.start();
+  currentOsc = osc;
+  currentGain = gain;
+
+  if (duration > 0) {
+    setTimeout(() => stopTone(), duration);
+  }
+  $('#speakerStatus').textContent = `Çalıyor: ${freq}Hz (pan: ${pan})`;
+  $('#speakerStatus').className = 'status ok';
+  setDot('dotSpeaker', 'ok');
+}
+
+function stopTone() {
+  if (currentOsc) {
+    try { currentOsc.stop(); } catch(e){}
+    currentOsc = null;
+  }
+  if (currentGain) { currentGain = null; }
+  $('#speakerStatus').textContent = 'Durduruldu.';
+}
+
+$('#playTone').addEventListener('click', () => playTone(440, 0));
+$('#stopTone').addEventListener('click', stopTone);
+$('#playLeft').addEventListener('click', () => playTone(440, -1));
+$('#playRight').addEventListener('click', () => playTone(440, 1));
+
+/* ============================================================
+   4. MİKROFON TESTİ
+============================================================ */
+const micCanvas = $('#micCanvas');
+const mctx = micCanvas.getContext('2d');
+let micStream = null;
+let micAnalyser = null;
+let micSource = null;
+let micRaf = null;
+
+function resizeMicCanvas() {
+  const rect = micCanvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  micCanvas.width = rect.width * dpr;
+  micCanvas.height = rect.height * dpr;
+  mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resizeMicCanvas);
+resizeMicCanvas();
+
+async function startMic() {
+  try {
+    const ctx = ensureAudioCtx();
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micSource = ctx.createMediaStreamSource(micStream);
+    micAnalyser = ctx.createAnalyser();
+    micAnalyser.fftSize = 2048;
+    micSource.connect(micAnalyser);
+
+    const data = new Uint8Array(micAnalyser.frequencyBinCount);
+
+    function draw() {
+      micRaf = requestAnimationFrame(draw);
+      micAnalyser.getByteTimeDomainData(data);
+      const rect = micCanvas.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      mctx.clearRect(0, 0, w, h);
+      mctx.lineWidth = 2;
+      mctx.strokeStyle = '#4f8cff';
+      mctx.beginPath();
+      const slice = w / data.length;
+      let x = 0;
+      let peak = 0;
+      for (let i = 0; i < data.length; i++) {
+        const v = data[i] / 128.0;
+        const y = (v * h) / 2;
+        const dev = Math.abs(v - 1);
+        if (dev > peak) peak = dev;
+        if (i === 0) mctx.moveTo(x, y);
+        else mctx.lineTo(x, y);
+        x += slice;
+      }
+      mctx.stroke();
+
+      if (peak > 0.05) {
+        $('#micStatus').textContent = `Ses algılandı ✓ (seviye: ${(peak*100).toFixed(1)}%)`;
+        $('#micStatus').className = 'status ok';
+        setDot('dotMic', 'ok');
+      } else {
+        $('#micStatus').textContent = 'Sessiz... Mikrofona konuşun.';
+        $('#micStatus').className = 'status';
+      }
+    }
+    draw();
+  } catch (err) {
+    $('#micStatus').textContent = 'Hata: ' + err.message;
+    $('#micStatus').className = 'status err';
+    setDot('dotMic', 'err');
+  }
+}
+
+function stopMic() {
+  if (micRaf) cancelAnimationFrame(micRaf);
+  if (micSource) { try { micSource.disconnect(); } catch(e){} }
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  micStream = null; micSource = null; micAnalyser = null;
+  const rect = micCanvas.getBoundingClientRect();
+  mctx.clearRect(0, 0, rect.width, rect.height);
+  $('#micStatus').textContent = 'Mikrofon durduruldu.';
+  $('#micStatus').className = 'status';
+}
+$('#startMic').addEventListener('click', startMic);
+$('#stopMic').addEventListener('click', stopMic);
+
+/* ============================================================
+   5. TİTREŞİM TESTİ
+============================================================ */
+function checkVibration() {
+  const el = $('#vibStatus');
+  if (!('vibrate' in navigator)) {
+    el.textContent = 'Titreşim API desteklenmiyor.';
+    el.className = 'status err';
+    setDot('dotVibrate', 'err');
+  } else {
+    el.textContent = 'Titreşim API destekleniyor. Test edin.';
+    el.className = 'status ok';
+    setDot('dotVibrate', 'ok');
+  }
+}
+checkVibration();
+
+$('#vibShort').addEventListener('click', () => navigator.vibrate?.(100));
+$('#vibLong').addEventListener('click', () => navigator.vibrate?.(500));
+$('#vibPattern').addEventListener('click', () => navigator.vibrate?.([200, 100, 200]));
+
+/* ============================================================
+   6. İNTERNET BAĞLANTI TESTİ
+============================================================ */
+async function testNetwork() {
+  const el = $('#netStatus');
+  el.className = 'status';
+  el.textContent = 'Test ediliyor...';
+
+  if (!navigator.onLine) {
+    el.textContent = '❌ Çevrimdışı (navigator.onLine = false)';
+    el.className = 'status err';
+    setDot('dotNet', 'err');
+    return;
+  }
+
+  const start = performance.now();
+  try {
+    // Cache bypass ile küçük bir istek
+    const res = await fetch('https://www.gstatic.com/generate_204?_=' + Date.now(), {
+      method: 'GET',
+      cache: 'no-store',
+      mode: 'no-cors'
+    });
+    const ms = Math.round(performance.now() - start);
+    el.textContent = `✓ Bağlantı aktif (${ms} ms) • Tip: ${getConnectionType()}`;
+    el.className = 'status ok';
+    setDot('dotNet', 'ok');
+  } catch (e) {
+    el.textContent = '❌ Bağlantı hatası: ' + e.message;
+    el.className = 'status err';
+    setDot('dotNet', 'err');
+  }
+}
+
+function getConnectionType() {
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!c) return 'bilinmiyor';
+  return c.effectiveType || c.type || 'bilinmiyor';
+}
+
+window.addEventListener('online', testNetwork);
+window.addEventListener('offline', testNetwork);
+$('#testNet').addEventListener('click', testNetwork);
+testNetwork();
+
+/* ============================================================
+   SERVICE WORKER KAYDI
+============================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('SW kayıt hatası:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
